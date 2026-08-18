@@ -30,10 +30,10 @@ type WorkerPool struct {
 	started       bool
 
 	// Метрики (используем atomic для потокобезопасности)
-	totalTasks     int64
-	completedTasks int64
-	failedTasks    int64
-	totalDuration  int64 // наносекунды
+	totalTasks     atomic.Int64
+	completedTasks atomic.Int64
+	failedTasks    atomic.Int64
+	totalDuration  atomic.Int64 // наносекунды
 
 	closeOnce sync.Once
 }
@@ -116,7 +116,7 @@ func (wp *WorkerPool) AddTaskWithPriority(priority int, task Task) error {
 
 	select {
 	case queue <- task:
-		atomic.AddInt64(&wp.totalTasks, 1)
+		wp.totalTasks.Add(1)
 		return nil
 	default:
 		return fmt.Errorf("%s priority queue is full", priorityName(priority))
@@ -306,13 +306,13 @@ func (wp *WorkerPool) executeTask(task Task, workerID int) {
 	defer func() {
 		// Используем elapsed и передаём в atomic.AddInt64
 		elapsed := time.Since(start).Nanoseconds()
-		atomic.AddInt64(&wp.totalDuration, elapsed)
+		wp.totalDuration.Add(elapsed)
 	}()
 
 	// Защита от паники в задаче.
 	defer func() {
 		if r := recover(); r != nil {
-			atomic.AddInt64(&wp.failedTasks, 1)
+			wp.failedTasks.Add(1)
 			select {
 			case wp.errorCh <- fmt.Errorf("task panic in worker %d: %v", workerID, r):
 			default:
@@ -321,36 +321,36 @@ func (wp *WorkerPool) executeTask(task Task, workerID int) {
 	}()
 
 	if err := task(wp.ctx); err != nil {
-		atomic.AddInt64(&wp.failedTasks, 1)
+		wp.failedTasks.Add(1)
 		select {
 		case wp.errorCh <- fmt.Errorf("task error in worker %d: %w", workerID, err):
 		default:
 		}
 	} else {
-		atomic.AddInt64(&wp.completedTasks, 1)
+		wp.completedTasks.Add(1)
 	}
 }
 
 // --- Метрики ---
 
 func (wp *WorkerPool) TotalTasks() int64 {
-	return atomic.LoadInt64(&wp.totalTasks)
+	return wp.totalTasks.Load()
 }
 
 func (wp *WorkerPool) CompletedTasks() int64 {
-	return atomic.LoadInt64(&wp.completedTasks)
+	return wp.completedTasks.Load()
 }
 
 func (wp *WorkerPool) FailedTasks() int64 {
-	return atomic.LoadInt64(&wp.failedTasks)
+	return wp.failedTasks.Load()
 }
 
 func (wp *WorkerPool) AverageDuration() float64 {
-	completed := atomic.LoadInt64(&wp.completedTasks)
+	completed := wp.completedTasks.Load()
 	if completed == 0 {
 		return 0
 	}
-	total := atomic.LoadInt64(&wp.totalDuration)
+	total := wp.totalDuration.Load()
 	return float64(total) / float64(completed)
 }
 
