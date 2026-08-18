@@ -17,14 +17,8 @@ func TestNewWorkerPool(t *testing.T) {
 	if wp.targetWorkers != 3 {
 		t.Errorf("expected targetWorkers 3, got %d", wp.targetWorkers)
 	}
-	if cap(wp.highTaskQueue) != 5 {
-		t.Errorf("expected highTaskQueue cap 5, got %d", cap(wp.highTaskQueue))
-	}
-	if cap(wp.mediumTaskQueue) != 5 {
-		t.Errorf("expected mediumTaskQueue cap 5, got %d", cap(wp.mediumTaskQueue))
-	}
-	if cap(wp.lowTaskQueue) != 5 {
-		t.Errorf("expected lowTaskQueue cap 5, got %d", cap(wp.lowTaskQueue))
+	if cap(wp.taskQueue) != 5 {
+		t.Errorf("Expected taskQueue woth cap 5, but got %d", cap(wp.taskQueue))
 	}
 	if cap(wp.errorCh) != 5 {
 		t.Errorf("expected errorCh cap 5, got %d", cap(wp.errorCh))
@@ -332,7 +326,7 @@ func TestPriority(t *testing.T) {
 
 	for i := 0; i < 3; i++ {
 		wg.Add(1)
-		err := wp.AddTaskWithPriority(HighPriority, func(ctx context.Context) error {
+		err := wp.AddTask(func(ctx context.Context) error {
 			defer wg.Done()
 			mu.Lock()
 			order = append(order, 0)
@@ -340,52 +334,18 @@ func TestPriority(t *testing.T) {
 			return nil
 		})
 		if err != nil {
-			t.Fatalf("failed to add high task: %v", err)
-		}
-
-		wg.Add(1)
-		err = wp.AddTaskWithPriority(MediumPriority, func(ctx context.Context) error {
-			defer wg.Done()
-			mu.Lock()
-			order = append(order, 1)
-			mu.Unlock()
-			return nil
-		})
-		if err != nil {
-			t.Fatalf("failed to add medium task: %v", err)
-		}
-
-		wg.Add(1)
-		err = wp.AddTaskWithPriority(LowPriority, func(ctx context.Context) error {
-			defer wg.Done()
-			mu.Lock()
-			order = append(order, 2)
-			mu.Unlock()
-			return nil
-		})
-		if err != nil {
-			t.Fatalf("failed to add low task: %v", err)
+			t.Fatalf("Failed to add task: %v", err)
 		}
 	}
 
 	wg.Wait()
 
-	if len(order) != 9 {
+	if len(order) != 3 {
 		t.Fatalf("expected 9 tasks, got %d", len(order))
 	}
 	for i := 0; i < 3; i++ {
 		if order[i] != 0 {
-			t.Errorf("position %d: expected 0 (High), got %d", i, order[i])
-		}
-	}
-	for i := 3; i < 6; i++ {
-		if order[i] != 1 {
-			t.Errorf("position %d: expected 1 (Medium), got %d", i, order[i])
-		}
-	}
-	for i := 6; i < 9; i++ {
-		if order[i] != 2 {
-			t.Errorf("position %d: expected 2 (Low), got %d", i, order[i])
+			t.Errorf("Position %d: expected 0, got %d", i, order[i])
 		}
 	}
 }

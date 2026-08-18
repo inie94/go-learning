@@ -15,9 +15,7 @@ type Task func(ctx context.Context) error
 
 // WorkerPool управляет пулом горутин с дополнительными улучшениями.
 type WorkerPool struct {
-	highTaskQueue   chan Task
-	mediumTaskQueue chan Task
-	lowTaskQueue    chan Task
+	taskQueue		chan Task
 	errorCh         chan error
 
 	ctx    context.Context
@@ -47,9 +45,7 @@ func NewWorkerPool(workersCount int, queueSize int) *WorkerPool {
 		queueSize = 0
 	}
 	return &WorkerPool{
-		highTaskQueue:   make(chan Task, queueSize),
-		mediumTaskQueue: make(chan Task, queueSize),
-		lowTaskQueue:    make(chan Task, queueSize),
+		taskQueue: make(chan Task, queueSize),
 		errorCh:         make(chan error, queueSize),
 		targetWorkers:   workersCount,
 	}
@@ -80,57 +76,24 @@ func (wp *WorkerPool) startWorker() {
 
 // AddTask добавляет задачу со средним приоритетом.
 func (wp *WorkerPool) AddTask(task Task) error {
-	return wp.AddTaskWithPriority(MediumPriority, task)
-}
-
-// Приоритеты.
-const (
-	HighPriority   = 2
-	MediumPriority = 1
-	LowPriority    = 0
-)
-
-// AddTaskWithPriority добавляет задачу в указанную очередь.
-func (wp *WorkerPool) AddTaskWithPriority(priority int, task Task) error {
-	wp.workerMu.Lock()
+wp.workerMu.Lock()
 	started := wp.started
 	wp.workerMu.Unlock()
 	if !started {
-		return errors.New("pool not started")
+		return errors.New("Pool not started")
 	}
 	select {
 	case <-wp.ctx.Done():
-		return errors.New("pool is stopped")
+		return errors.New("Pool is stopped")
 	default:
-	}
-
-	var queue chan Task
-	switch priority {
-	case HighPriority:
-		queue = wp.highTaskQueue
-	case LowPriority:
-		queue = wp.lowTaskQueue
-	default:
-		queue = wp.mediumTaskQueue
 	}
 
 	select {
-	case queue <- task:
+	case wp.taskQueue <- task:
 		wp.totalTasks.Add(1)
 		return nil
 	default:
-		return fmt.Errorf("%s priority queue is full", priorityName(priority))
-	}
-}
-
-func priorityName(p int) string {
-	switch p {
-	case HighPriority:
-		return "high"
-	case LowPriority:
-		return "low"
-	default:
-		return "medium"
+		return fmt.Errorf("Task queue is full")
 	}
 }
 
@@ -169,9 +132,7 @@ func (wp *WorkerPool) Stop() {
 		return
 	}
 	// Закрываем очереди задач – воркеры выйдут после их опустошения.
-	close(wp.highTaskQueue)
-	close(wp.mediumTaskQueue)
-	close(wp.lowTaskQueue)
+	close(wp.taskQueue)
 	// Запрещаем добавление новых задач.
 	wp.started = false
 }
@@ -205,10 +166,6 @@ func (wp *WorkerPool) worker(id int, ctx context.Context) {
 		}
 	}()
 
-	highCh := wp.highTaskQueue
-	mediumCh := wp.mediumTaskQueue
-	lowCh := wp.lowTaskQueue
-
 	for {
 		// Проверка: нужно ли удалить воркера (при динамическом изменении количества)
 		wp.workerMu.Lock()
@@ -219,78 +176,17 @@ func (wp *WorkerPool) worker(id int, ctx context.Context) {
 		}
 
 		// Если все очереди закрыты, выходим
-		if highCh == nil && mediumCh == nil && lowCh == nil {
+		if wp.taskQueue == nil {
 			return
-		}
-
-		// Приоритет: сначала high, потом medium, потом low
-		if highCh != nil {
-			select {
-			case <-ctx.Done():
-				return
-			case task, ok := <-highCh:
-				if !ok {
-					highCh = nil // исключаем канал
-					continue
-				}
-				wp.executeTask(task, id)
-				continue
-			default:
-				// high пуст – переходим к medium
-			}
-		}
-
-		if mediumCh != nil {
-			select {
-			case <-ctx.Done():
-				return
-			case task, ok := <-mediumCh:
-				if !ok {
-					mediumCh = nil
-					continue
-				}
-				wp.executeTask(task, id)
-				continue
-			default:
-				// medium пуст – переходим к low
-			}
-		}
-
-		if lowCh != nil {
-			select {
-			case <-ctx.Done():
-				return
-			case task, ok := <-lowCh:
-				if !ok {
-					lowCh = nil
-					continue
-				}
-				wp.executeTask(task, id)
-				continue
-			default:
-				// low пуст – все очереди пусты
-			}
 		}
 
 		// Все очереди пусты, но не закрыты – ждём появления данных в любой из них
 		select {
 		case <-ctx.Done():
 			return
-		case task, ok := <-highCh:
+		case task, ok :=  <-wp.taskQueue:
 			if !ok {
-				highCh = nil
-				continue
-			}
-			wp.executeTask(task, id)
-		case task, ok := <-mediumCh:
-			if !ok {
-				mediumCh = nil
-				continue
-			}
-			wp.executeTask(task, id)
-		case task, ok := <-lowCh:
-			if !ok {
-				lowCh = nil
+				wp.taskQueue = nil
 				continue
 			}
 			wp.executeTask(task, id)
