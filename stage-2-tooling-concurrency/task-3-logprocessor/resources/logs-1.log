@@ -1,0 +1,10 @@
+192.168.1.10 - - [22/Aug/2026:10:15:32 +0000] "GET /api/users HTTP/1.1" 200 1024
+10.0.0.5 - - [22/Aug/2026:10:15:33 +0000] "POST /login HTTP/1.1" 500 512 - ERROR: database timeout
+172.16.0.1 - - [22/Aug/2026:10:15:34 +0000] "GET /index.html HTTP/1.1" 200 2048
+192.168.1.10 - - [22/Aug/2026:10:15:35 +0000] "GET /dashboard HTTP/1.1" 404 256 - ERROR: not found
+10.0.0.5 - - [22/Aug/2026:10:15:36 +0000] "PUT /profile HTTP/1.1" 200 128
+192.168.1.20 - - [22/Aug/2026:10:15:37 +0000] "DELETE /item/12 HTTP/1.1" 500 64 - panic: runtime error
+10.0.0.5 - - [22/Aug/2026:10:15:38 +0000] "GET /images/logo.png HTTP/1.1" 200 4096
+172.16.0.1 - - [22/Aug/2026:10:15:39 +0000] "GET /styles.css HTTP/1.1" 200 1024
+192.168.1.20 - - [22/Aug/2026:10:15:40 +0000] "GET /js/app.js HTTP/1.1" 200 8192
+10.0.0.5 - - [22/Aug/2026:10:15:41 +0000] "GET /api/status HTTP/1.1" 500 128 - ERROR: connection refused

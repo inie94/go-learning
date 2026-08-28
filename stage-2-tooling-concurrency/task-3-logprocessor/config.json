@@ -1,0 +1,11 @@
+{
+  "chunkSize": "2MB",
+  "workers": 8,
+  "errorKeywords": ["error", "ERROR", "panic", "fatal"],
+  "output": "stats.json",
+  "outputFormat": "json",
+  "verbose": true,
+  "fromTime": "2026-01-01T00:00:00",
+  "toTime": "2026-01-31T23:59:59",
+  "timeFormat": "2006-01-02T15:04:05"
+}
