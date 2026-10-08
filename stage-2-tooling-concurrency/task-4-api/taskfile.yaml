@@ -1,0 +1,62 @@
+# Taskfile.yml
+version: '3'
+
+vars:
+  # Пути к директориям проекта
+  BIN_DIR: ./bin
+  GEN_DIR: ./internal/api/generated
+  CMD_DIR: ./cmd/server
+  # Путь к OpenAPI-спецификации
+  OAPI_SPEC: ./internal/api/task-manager-api.yml
+  OAPI_CONFIG: ./internal/api/ogen-config.yaml
+  # Параметры приложения
+  APP_NAME: task-manager
+
+tasks:
+  # Очистка сгенерированных файлов и бинарников
+  clean:
+    desc: "Удаляет сгенерированный код и скомпилированные бинарники"
+    silent: true
+    cmds:
+      - rm -rf {{.GEN_DIR}}
+      - rm -rf {{.BIN_DIR}}
+  # Генерация кода через ogen
+  generate:
+    desc: "Генерирует Go-код из OpenAPI-спецификации с помощью ogen"
+    deps: [clean]
+    # Отпечаток: задача выполнится только если SPEC изменился
+    sources:
+      - "{{.SPEC}}"
+      - "go.mod"
+      - "go.sum"
+    # Файлы, которые создаёт ogen
+    generates:
+      - "{{.GEN_DIR}}/*.go"
+    cmds:
+      # Создаём директорию, если её нет
+      - mkdir -p {{.GEN_DIR}}
+      # ogen запускается через go run, чтобы использовать версию из go.mod
+      - go tool ogen --clean --target {{.GEN_DIR}} --config {{.OAPI_CONFIG}} {{.OAPI_SPEC}}
+
+  # Компиляция Go-приложения
+  build:
+    desc: "Компилирует Go-приложение в {{.BIN_DIR}}/{{.APP_NAME}}"
+    deps: [generate]
+    # Отпечаток: отслеживаем все исходники и файлы модуля
+    sources:
+      - "{{.CMD_DIR}}/**/*.go"
+      - "{{.GEN_DIR}}/**/*.go"
+      - "go.mod"
+      - "go.sum"
+    generates:
+      - "{{.BIN_DIR}}/{{.APP_NAME}}"
+    cmds:
+      # Создаём директорию для бинарника
+      - mkdir -p {{.BIN_DIR}}
+      - go build -o {{.BIN_DIR}}/{{.APP_NAME}} {{.CMD_DIR}}
+
+  # Полный цикл: clean → generate → build
+  all:
+    desc: "Полный цикл: очистка → генерация → сборка"
+    cmds:
+      - task: build

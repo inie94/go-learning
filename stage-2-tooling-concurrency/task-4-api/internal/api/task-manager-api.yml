@@ -1,0 +1,285 @@
+openapi: 3.0.0
+info:
+  title: Task Management API
+  description: API для управления задачами (CRUD). Используется в качестве примера для тестирования.
+  version: 1.0.0
+  contact:
+    name: Support
+    email: support@example.com
+
+servers:
+  - url: https://api.example.com/v1
+    description: Production server
+  - url: http://localhost:8080/v1
+    description: Local development server
+
+paths:
+  /tasks:
+    get:
+      summary: Получить список всех задач
+      description: Возвращает массив задач. Если задач нет, возвращает пустой массив.
+      operationId: getTasks
+      tags:
+        - Tasks
+      responses:
+        "200":
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Task"
+        "500":
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      summary: Создать новую задачу
+      description: Принимает JSON с полями title (обязательно), description (опционально), completed (по умолчанию false). ID и created_at генерируются сервером.
+      operationId: createTask
+      tags:
+        - Tasks
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTaskRequest"
+      responses:
+        "201":
+          description: Задача успешно создана
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+        "400":
+          description: Ошибка валидации или некорректный JSON
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /tasks/{id}:
+    get:
+      summary: Получить задачу по ID
+      description: Возвращает задачу с указанным UUID.
+      operationId: getTaskById
+      tags:
+        - Tasks
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: UUID задачи
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+        "400":
+          description: Невалидный формат ID
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Задача не найдена
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    put:
+      summary: Обновить задачу
+      description: Заменяет все поля задачи (кроме ID и created_at) на переданные. Все поля в теле опциональны, но если переданы, то применяются.
+      operationId: updateTask
+      tags:
+        - Tasks
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: UUID задачи
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateTaskRequest"
+      responses:
+        "200":
+          description: Задача успешно обновлена
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+        "400":
+          description: Невалидный ID или некорректный JSON
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Задача не найдена
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    delete:
+      summary: Удалить задачу
+      description: Удаляет задачу по UUID.
+      operationId: deleteTask
+      tags:
+        - Tasks
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: UUID задачи
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Задача успешно удалена (тело ответа пустое)
+        "400":
+          description: Невалидный формат ID
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Задача не найдена
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+components:
+  schemas:
+    Task:
+      type: object
+      required:
+        - id
+        - title
+        - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Уникальный идентификатор задачи (генерируется сервером)
+        title:
+          type: string
+          description: Название задачи (обязательное)
+        description:
+          type: string
+          description: Описание задачи (опционально)
+        completed:
+          type: boolean
+          description: Статус выполнения
+          default: false
+        created_at:
+          type: string
+          format: date-time
+          description: Дата и время создания (генерируется сервером)
+      example:
+        id: "123e4567-e89b-12d3-a456-426614174000"
+        title: "Купить молоко"
+        description: "Купить 2 литра молока в магазине"
+        completed: false
+        created_at: "2026-08-28T12:34:56Z"
+
+    CreateTaskRequest:
+      type: object
+      required:
+        - title
+      properties:
+        title:
+          type: string
+          description: Название задачи (обязательное)
+        description:
+          type: string
+          description: Описание задачи (опционально)
+        completed:
+          type: boolean
+          description: Статус выполнения (по умолчанию false)
+      example:
+        title: "Купить молоко"
+        description: "Купить 2 литра молока в магазине"
+        completed: false
+
+    UpdateTaskRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          description: Новое название задачи
+        description:
+          type: string
+          description: Новое описание задачи
+        completed:
+          type: boolean
+          description: Новый статус выполнения
+      example:
+        title: "Купить молоко и хлеб"
+        completed: true
+
+    ErrorResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          description: Текст ошибки
+        code:
+          type: string
+          description: Код ошибки (опционально)
+        details:
+          type: object
+          description: Дополнительные детали (например, поля, которые не прошли валидацию)
+      required:
+        - message
+      example:
+        message: "Validation failed: title is required"
+        code: "VALIDATION_ERROR"
+
+  securitySchemes: {}
+
+tags:
+  - name: Tasks
+    description: Операции с задачами
