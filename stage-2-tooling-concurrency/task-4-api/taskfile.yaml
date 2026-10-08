@@ -1,5 +1,4 @@
-# Taskfile.yml
-version: '3'
+version: "3"
 
 vars:
   # Пути к директориям проекта
